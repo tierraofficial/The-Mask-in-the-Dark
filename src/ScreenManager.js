@@ -35,9 +35,25 @@ export class ScreenManager {
         // 教程界面：点击按钮进入游戏
         const startGameBtn = document.getElementById('start-game-btn');
         if (startGameBtn) {
-            startGameBtn.addEventListener('click', (e) => {
+            startGameBtn.addEventListener('click', async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+
+                // Attempt Fullscreen & Orientation Lock (Mobile)
+                try {
+                    if (document.documentElement.requestFullscreen) {
+                        await document.documentElement.requestFullscreen();
+                    } else if (document.documentElement.webkitRequestFullscreen) {
+                        await document.documentElement.webkitRequestFullscreen();
+                    }
+
+                    if (screen.orientation && screen.orientation.lock) {
+                        await screen.orientation.lock('landscape').catch(err => console.warn("Lock failed:", err));
+                    }
+                } catch (err) {
+                    console.warn("Fullscreen/Orientation failed:", err);
+                }
+
                 this.showGameScreen();
             });
         }

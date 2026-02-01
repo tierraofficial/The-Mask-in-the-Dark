@@ -1,4 +1,4 @@
-import { GAME_SETTINGS, RENDER_3D_SETTINGS } from './Config.js';
+import { GAME_SETTINGS, RENDER_3D_SETTINGS, COLORS_3D } from './Config.js';
 /**
  * Raycaster Engine Module
  * Extracted from raycasting_demo.html
@@ -47,15 +47,27 @@ export class Raycaster {
             darkFogDist: RENDER_3D_SETTINGS.DARK_FOG_DIST
         };
 
+        // Mobile Touch State
+        this.touchInput = { moveId: null, startX: 0, startY: 0, currX: 0, currY: 0, lookId: null, lastLookX: 0 };
+        this.isMobile = (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) || /Android|webOS|iPhone|iPad|iPod|BlackBerry/i.test(navigator.userAgent);
+
         this.game = {
             doorCooldown: 0.0,
             maxCooldown: GAME_SETTINGS.TURN_TIME_LIMIT / 1000
         };
 
+        // Helper: Hex to RGB
+        const hexToRgb = (hex) => {
+            // Take only first 6 hex digits (RRGGBB), ignoring alpha if present
+            const cleanHex = hex.slice(1, 7);
+            const bigint = parseInt(cleanHex, 16);
+            return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+        };
+
         this.COLORS_BASE = {
-            ceiling: { r: 26, g: 26, b: 26 },
-            floorFar: { r: 17, g: 17, b: 17 },
-            floor: { r: 93, g: 85, b: 65 }
+            ceiling: typeof COLORS_3D.CEILING === 'string' ? hexToRgb(COLORS_3D.CEILING) : COLORS_3D.CEILING,
+            floorFar: typeof COLORS_3D.FLOOR_FAR === 'string' ? hexToRgb(COLORS_3D.FLOOR_FAR) : COLORS_3D.FLOOR_FAR,
+            floor: typeof COLORS_3D.FLOOR_NEAR === 'string' ? hexToRgb(COLORS_3D.FLOOR_NEAR) : COLORS_3D.FLOOR_NEAR
         };
 
         // UI Elements (Optional bindings)
@@ -228,6 +240,13 @@ export class Raycaster {
     }
 
     initInput() {
+        // Mobile Touch Events
+        if (this.isMobile) {
+            this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+            this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+            this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
+        }
+
         // Pointer Lock & Interaction
         this.canvas.addEventListener('mousedown', (e) => {
             if (document.pointerLockElement !== this.canvas) {
@@ -258,6 +277,76 @@ export class Raycaster {
     unlockPointer() {
         if (document.pointerLockElement === this.canvas) {
             document.exitPointerLock();
+        }
+    }
+
+    // --- Touch Handlers ---
+
+    handleTouchStart(e) {
+        // No default prevention here to allow other behaviors if needed, 
+        // but usually for games we want to prevent scrolling.
+        if (e.target === this.canvas) e.preventDefault();
+
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            const screenHalf = window.innerWidth / 2;
+
+            // Left half: Move Joystick
+            if (t.pageX < screenHalf && this.touchInput.moveId === null) {
+                this.touchInput.moveId = t.identifier;
+                this.touchInput.startX = t.pageX; this.touchInput.startY = t.pageY;
+                this.touchInput.currX = t.pageX; this.touchInput.currY = t.pageY;
+            }
+            // Right half: Look Control
+            else if (t.pageX >= screenHalf && this.touchInput.lookId === null) {
+                this.touchInput.lookId = t.identifier;
+                this.touchInput.lastLookX = t.pageX;
+            }
+        }
+    }
+
+    handleTouchMove(e) {
+        if (e.target === this.canvas) e.preventDefault();
+
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+
+            if (t.identifier === this.touchInput.moveId) {
+                this.touchInput.currX = t.pageX; this.touchInput.currY = t.pageY;
+
+                const deltaX = this.touchInput.currX - this.touchInput.startX;
+                const deltaY = this.touchInput.currY - this.touchInput.startY;
+                const threshold = 30; // Movement threshold
+
+                // Update keys based on virtual joystick position
+                this.keys.w = deltaY < -threshold;
+                this.keys.s = deltaY > threshold;
+                this.keys.a = deltaX < -threshold;
+                this.keys.d = deltaX > threshold;
+            }
+            else if (t.identifier === this.touchInput.lookId) {
+                const deltaX = t.pageX - this.touchInput.lastLookX;
+                // Use a multiplier for touch sensitivity
+                this.rotateCamera(-deltaX * 0.005);
+                this.touchInput.lastLookX = t.pageX;
+            }
+        }
+    }
+
+    handleTouchEnd(e) {
+        if (e.target === this.canvas) e.preventDefault();
+
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+
+            if (t.identifier === this.touchInput.moveId) {
+                this.touchInput.moveId = null;
+                // Reset movement keys
+                this.keys.w = this.keys.s = this.keys.a = this.keys.d = false;
+            }
+            if (t.identifier === this.touchInput.lookId) {
+                this.touchInput.lookId = null;
+            }
         }
     }
 
@@ -479,6 +568,11 @@ export class Raycaster {
         ctx.fillStyle = scaleColor(this.COLORS_BASE.ceiling, globalBrightness);
         ctx.fillRect(0, 0, width, height / 2);
 
+        // Joystick (Mobile Only)
+        if (this.isMobile && this.touchInput.moveId !== null) {
+            this.drawJoystick();
+        }
+
         // Floor
         const floorGradient = ctx.createLinearGradient(0, height / 2, 0, height);
         floorGradient.addColorStop(0, scaleColor(this.COLORS_BASE.floorFar, globalBrightness));
@@ -582,6 +676,7 @@ export class Raycaster {
             if (finalAlpha > 0) {
                 ctx.fillStyle = `rgba(0,0,0,${finalAlpha})`;
                 ctx.fillRect(x, drawStart, 1, lineHeight);
+
             }
         }
 
@@ -590,5 +685,29 @@ export class Raycaster {
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(cx - size, cy); ctx.lineTo(cx + size, cy);
         ctx.moveTo(cx, cy - size); ctx.lineTo(cx, cy + size); ctx.stroke();
+    }
+
+    // Helper to draw joystick overlay
+    drawJoystick() {
+        if (!this.touchInput.moveId) return;
+
+        const rect = this.canvas.getBoundingClientRect();
+        const startX = this.touchInput.startX - rect.left;
+        const startY = this.touchInput.startY - rect.top;
+        const currX = this.touchInput.currX - rect.left;
+        const currY = this.touchInput.currY - rect.top;
+
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.arc(startX, startY, 50, 0, Math.PI * 2);
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        this.ctx.lineWidth = 4;
+        this.ctx.stroke();
+
+        this.ctx.beginPath();
+        this.ctx.arc(currX, currY, 25, 0, Math.PI * 2);
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        this.ctx.fill();
+        this.ctx.restore();
     }
 }

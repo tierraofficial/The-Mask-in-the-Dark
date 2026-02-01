@@ -701,3 +701,37 @@ canvas#gameCanvas {
 .tutorial-btn:active {
     transform: scale(0.95);
 }
+/* --- Mobile Landscape Hint --- */
+#landscape-hint {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    color: #ffd700;
+    z-index: 9999;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+#landscape-hint h1 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #ff4444;
+}
+
+#landscape-hint p {
+    font-size: 1.2rem;
+    color: #888;
+}
+
+@media screen and (orientation: portrait) and (max-width: 900px) {
+    #landscape-hint {
+        display: flex !important;
+    }
+}
+

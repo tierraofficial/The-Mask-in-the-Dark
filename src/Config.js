@@ -19,6 +19,12 @@ export const RENDER_3D_SETTINGS = {
     DARK_FOG_DIST: 4.0      // 黑暗房间的视野距离 (越小越压抑，视野越窄)
 };
 
+export const COLORS_3D = {
+    CEILING: '#1f1b0fff',    // { r: 26, g: 26, b: 26 }
+    FLOOR_FAR: '#35321fff',  // { r: 17, g: 17, b: 17 }
+    FLOOR_NEAR: '#5d5541'  // { r: 93, g: 85, b: 65 }
+};
+
 // 颜色定义 (Warm Retro Palette)
 // -----------------------------------------------------
 // 🎨 1. 液晶屏幕显示颜色 (LCD Screen / Canvas)
