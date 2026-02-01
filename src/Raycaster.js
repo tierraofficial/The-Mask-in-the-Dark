@@ -297,10 +297,24 @@ export class Raycaster {
                 this.touchInput.startX = t.pageX; this.touchInput.startY = t.pageY;
                 this.touchInput.currX = t.pageX; this.touchInput.currY = t.pageY;
             }
-            // Right half: Look Control
-            else if (t.pageX >= screenHalf && this.touchInput.lookId === null) {
-                this.touchInput.lookId = t.identifier;
-                this.touchInput.lastLookX = t.pageX;
+            // Right half: Look Control & Interaction
+            else if (t.pageX >= screenHalf) {
+                // Check Double Tap for Interaction
+                const now = Date.now();
+                if (this.touchInput.lastTapTime && (now - this.touchInput.lastTapTime < 300)) {
+                    // Double Tap Detected!
+                    if (this.game.doorCooldown <= 0) {
+                        this.attemptInteract();
+                    }
+                    this.touchInput.lastTapTime = 0; // Reset
+                } else {
+                    this.touchInput.lastTapTime = now;
+                }
+
+                if (this.touchInput.lookId === null) {
+                    this.touchInput.lookId = t.identifier;
+                    this.touchInput.lastLookX = t.pageX;
+                }
             }
         }
     }
