@@ -1,0 +1,218 @@
+/**
+ * ScreenManager - 管理游戏的五个界面层
+ * 界面流程: Start → Tutorial → Game → GameOverVideo → GameOverStats
+ */
+export class ScreenManager {
+    constructor(renderer, uiManager) {
+        this.renderer = renderer;
+        this.uiManager = uiManager;
+        this.currentScreen = 'start'; // 当前显示的界面
+        this.gameManager = null;
+        this.turnCount = 0; // 生存回合数
+        this.isWin = false; // 游戏是否赢了
+
+        // 获取DOM元素
+        this.startScreenEl = document.getElementById('start-screen');
+        this.tutorialScreenEl = document.getElementById('tutorial-screen');
+        this.gameScreenEl = document.getElementById('game-screen');
+        this.gameOverVideoScreenEl = document.getElementById('gameover-video-screen');
+        this.gameOverStatsScreenEl = document.getElementById('gameover-stats-screen');
+        this.gameOverVideoEl = document.getElementById('gameover-video');
+
+        // 绑定事件监听
+        this._bindEventListeners();
+    }
+
+    _bindEventListeners() {
+        // 开始界面：点击任意位置进入教程
+        if (this.startScreenEl) {
+            this.startScreenEl.addEventListener('click', () => {
+                this.showTutorialScreen();
+            });
+        }
+
+        // 教程界面：点击任意位置进入游戏
+        if (this.tutorialScreenEl) {
+            this.tutorialScreenEl.addEventListener('click', () => {
+                this.showGameScreen();
+            });
+        }
+
+        // 视频播放完成：显示统计界面
+        if (this.gameOverVideoEl) {
+            this.gameOverVideoEl.addEventListener('ended', () => {
+                this._onVideoEnded();
+            });
+        }
+
+        // 结算界面：重新开始按钮
+        const restartBtn = document.getElementById('restart-btn');
+        if (restartBtn) {
+            restartBtn.addEventListener('click', () => {
+                this.reset();
+            });
+        }
+
+        // 结算界面：回到开始按钮
+        const backToStartBtn = document.getElementById('back-to-start-btn');
+        if (backToStartBtn) {
+            backToStartBtn.addEventListener('click', () => {
+                this.reset();
+            });
+        }
+    }
+
+    /**
+     * 显示开始界面
+     */
+    showStartScreen() {
+        this._hideAllScreens();
+        if (this.startScreenEl) {
+            this.startScreenEl.classList.add('active');
+        }
+        this.currentScreen = 'start';
+        console.log("Screen: START");
+    }
+
+    /**
+     * 显示教程界面
+     */
+    showTutorialScreen() {
+        this._hideAllScreens();
+        if (this.tutorialScreenEl) {
+            this.tutorialScreenEl.classList.add('active');
+        }
+        this.currentScreen = 'tutorial';
+        console.log("Screen: TUTORIAL");
+    }
+
+    /**
+     * 显示游戏界面并初始化GameManager
+     */
+    showGameScreen() {
+        this._hideAllScreens();
+        if (this.gameScreenEl) {
+            this.gameScreenEl.classList.add('active');
+        }
+        this.currentScreen = 'game';
+        
+        // 导入GameManager（动态导入，避免循环依赖）
+        if (!this.gameManager) {
+            // GameManager将在main.js中传入
+            console.log("Waiting for GameManager initialization...");
+        }
+        
+        console.log("Screen: GAME");
+    }
+
+    /**
+     * 设置GameManager引用（由main.js调用）
+     */
+    setGameManager(gameManager) {
+        this.gameManager = gameManager;
+    }
+
+    /**
+     * 显示游戏结束视频界面
+     */
+    showGameOverVideo(turnCount, isWin) {
+        this._hideAllScreens();
+        if (this.gameOverVideoScreenEl) {
+            this.gameOverVideoScreenEl.classList.add('active');
+        }
+        
+        this.turnCount = turnCount;
+        this.isWin = isWin;
+        this.currentScreen = 'gameover-video';
+
+        // 重置视频并播放
+        if (this.gameOverVideoEl) {
+            this.gameOverVideoEl.currentTime = 0;
+            this.gameOverVideoEl.play();
+        }
+
+        console.log(`Screen: GAMEOVER VIDEO (Turns: ${turnCount}, Win: ${isWin})`);
+    }
+
+    /**
+     * 视频播放完成后显示统计界面
+     */
+    _onVideoEnded() {
+        this._hideAllScreens();
+        if (this.gameOverStatsScreenEl) {
+            this.gameOverStatsScreenEl.classList.add('active');
+        }
+        this.currentScreen = 'gameover-stats';
+
+        // 更新统计信息
+        this._updateGameOverStats();
+
+        console.log("Screen: GAMEOVER STATS");
+    }
+
+    /**
+     * 更新游戏结束统计信息
+     */
+    _updateGameOverStats() {
+        const turnCountEl = document.getElementById('gameover-turn-count');
+        const resultEl = document.getElementById('gameover-result');
+
+        if (turnCountEl) {
+            turnCountEl.innerText = `生存回合数: ${this.turnCount}`;
+        }
+
+        if (resultEl) {
+            if (this.isWin) {
+                resultEl.innerText = '🎉 恶灵已被驱逐！';
+                resultEl.style.color = '#fffacd';
+            } else {
+                resultEl.innerText = '陷入黑暗中...';
+                resultEl.style.color = '#ff4444';
+            }
+        }
+    }
+
+    /**
+     * 重置到开始界面（用于重新开始或回到开始）
+     */
+    reset() {
+        // 清理游戏状态
+        if (this.gameManager) {
+            this.gameManager.gameOver = true; // 标记游戏结束，停止游戏循环
+        }
+
+        // 重置计数
+        this.turnCount = 0;
+        this.isWin = false;
+
+        // 返回开始界面
+        this.showStartScreen();
+    }
+
+    /**
+     * 隐藏所有界面
+     */
+    _hideAllScreens() {
+        const screens = [
+            this.startScreenEl,
+            this.tutorialScreenEl,
+            this.gameScreenEl,
+            this.gameOverVideoScreenEl,
+            this.gameOverStatsScreenEl
+        ];
+
+        screens.forEach(screen => {
+            if (screen) {
+                screen.classList.remove('active');
+            }
+        });
+    }
+
+    /**
+     * 初始化ScreenManager（显示开始界面）
+     */
+    init() {
+        this.showStartScreen();
+        console.log("ScreenManager Initialized");
+    }
+}

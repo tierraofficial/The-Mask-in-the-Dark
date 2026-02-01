@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Mask in the Dark</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- 开始界面 (Start Screen) -->
+    <div id="start-screen" class="screen-overlay">
+        <img src="images/GameStart.jpg" alt="Game Start" class="fullscreen-image">
+    </div>
+
+    <!-- 教程界面 (Tutorial Screen) -->
+    <div id="tutorial-screen" class="screen-overlay">
+        <img src="images/GameTutorial.jpg" alt="Game Tutorial" class="fullscreen-image">
+    </div>
+
+    <!-- 游戏界面 (Game Screen) -->
+    <div id="game-screen" class="screen-overlay active">
+        <div class="device-body">
+            <div class="speaker-grill">
+                <span></span><span></span>
+            </div>
+
+            <div class="brand-text">LIGHT TERMINAL</div>
+
+            <div class="screen-bezel">
+                <div class="lcd-container">
+                    <div class="ui-bar">
+                        <span id="score-display">LUMENS: 0</span>
+                        <span id="ap-display">AP: 1</span>
+                        <span id="status-display">SAFE</span>
+                    </div>
+                    <canvas id="gameCanvas" width="600" height="600"></canvas>
+                </div>
+            </div>
+
+            <div class="controls-area">
+                <div class="d-pad">
+                    <div class="d-up hover-sound" data-key="ArrowUp"></div>
+                    <div class="d-left hover-sound" data-key="ArrowLeft"></div>
+                    <div class="d-center"></div>
+                    <div class="d-right hover-sound" data-key="ArrowRight"></div>
+                    <div class="d-down hover-sound" data-key="ArrowDown"></div>
+                </div>
+
+                <div class="btn-wrapper">
+                    <button class="big-btn hover-sound" data-key="Reveal"></button>
+                    <span class="label">SCAN (3)</span>
+                </div>
+            </div>
+
+            <div class="bottom-slots">
+                <div class="btn-wrapper">
+                    <button class="slot-btn hover-sound" data-key="r"></button>
+                    <span class="label">RESET</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 游戏结束视频界面 (Game Over Video Screen) -->
+    <div id="gameover-video-screen" class="screen-overlay">
+        <video id="gameover-video" class="fullscreen-video" src="videos/GameOver.mp4"></video>
+    </div>
+
+    <!-- 游戏结束统计界面 (Game Over Stats Screen) -->
+    <div id="gameover-stats-screen" class="screen-overlay">
+        <div class="gameover-stats-container">
+            <div id="gameover-result" class="gameover-result"></div>
+            <div id="gameover-turn-count" class="gameover-turn-count"></div>
+            
+            <div class="gameover-buttons">
+                <button id="restart-btn" class="gameover-btn restart-btn">重新开始</button>
+                <button id="back-to-start-btn" class="gameover-btn back-btn">回到开始</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+</body>
+
+</html>

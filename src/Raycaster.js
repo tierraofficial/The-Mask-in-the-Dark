@@ -13,7 +13,7 @@ export class Raycaster {
         this.width = 0; // Set in resize
         this.height = 0;
         this.MAP_SIZE = 42;
-        this.TEX_SIZE = 64;
+        this.TEX_SIZE = 512;
         this.WALL_HEIGHT_SCALE = 3.0;
         this.CELL_SIZE = 8;
         this.GRID_OFFSET = 1;

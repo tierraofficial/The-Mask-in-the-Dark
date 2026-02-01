@@ -1,0 +1,41 @@
+import { GameManager } from './GameManager.js';
+import { Renderer } from './Renderer.js';
+import { ScreenManager } from './ScreenManager.js';
+import { UIManager } from './UIManager.js';
+
+window.onload = () => {
+    // 初始化Renderer和UIManager
+    const renderer = new Renderer();
+    const uiManager = new UIManager();
+    
+    // 创建ScreenManager（但不初始化游戏）
+    const screenManager = new ScreenManager(renderer, uiManager);
+    
+    // 创建GameManager但不自动初始化
+    let gameManager = null;
+    
+    // 监听游戏界面显示事件，初始化游戏
+    const originalShowGameScreen = screenManager.showGameScreen.bind(screenManager);
+    screenManager.showGameScreen = function() {
+        originalShowGameScreen();
+        
+        // 在显示游戏界面时初始化GameManager
+        if (!gameManager) {
+            gameManager = new GameManager(renderer, screenManager);
+            screenManager.setGameManager(gameManager);
+            gameManager.init();
+            
+            // 启动游戏循环
+            window.focus();
+            console.log("Game Manager Initialized and Started");
+            
+            // Initial Render
+            renderer.draw(gameManager.gridSystem, gameManager.player, gameManager.spirit);
+            requestAnimationFrame((ts) => gameManager.loop(ts));
+        }
+    };
+    
+    // 初始化ScreenManager（显示开始界面）
+    screenManager.init();
+    console.log("Main Loaded - ScreenManager Initialized");
+};

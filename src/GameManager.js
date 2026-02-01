@@ -47,17 +47,41 @@ export class GameManager {
         this.checkDanger();
 
         this.revealCount = 0;
+        this.turnCount = 0;
         this.turn = 'PLAYER';
+        this.spirit.visible = false; // Reset Visibility on Restart
 
         // Reset UI Label
         const btnLabel = document.querySelector('.btn-wrapper .label');
         if (btnLabel) btnLabel.innerText = "SCAN (3)";
 
+        // Force Raycaster Re-init (Rebuild Map/Textures)
+        if (this.raycaster) {
+            // We need to re-run initMap mostly, but init() does it all.
+            // Careful not to double-bind listeners, but Raycaster.init handles that?
+            // Actually Raycaster.init binds listeners every time. That's bad.
+            // Let's create a reInitMap method in Raycaster or just call initMap.
+            // For now, let's look at Raycaster.js. 
+            // Raycaster.init calls initMap. 
+            // Let's assume Raycaster needs a hard reset method.
+            // For this step, I'll just trigger map update.
+            this.raycaster.initMap(this.gridSystem);
+
+            // Reset Player Position in Raycaster to match new Grid
+            const startX = GAME_SETTINGS.PLAYER_START.x;
+            const startY = GAME_SETTINGS.PLAYER_START.y;
+            this.raycaster.player.x = this.raycaster.GRID_OFFSET + startX * this.raycaster.CELL_SIZE + this.raycaster.CELL_SIZE / 2.0;
+            this.raycaster.player.y = this.raycaster.GRID_OFFSET + startY * this.raycaster.CELL_SIZE + this.raycaster.CELL_SIZE / 2.0;
+        }
+
         // Start Animation Loop
-        requestAnimationFrame((ts) => this.loop(ts));
+        this.reqId = requestAnimationFrame((ts) => this.loop(ts));
 
         console.log("Game Initialized (Strict Turn Mode)");
     }
+
+
+
 
     loop(timestamp) {
         if (!this.lastTime) this.lastTime = timestamp;
@@ -74,7 +98,7 @@ export class GameManager {
         }
 
         this.draw();
-        requestAnimationFrame((ts) => this.loop(ts));
+        this.reqId = requestAnimationFrame((ts) => this.loop(ts));
     }
 
 
@@ -222,7 +246,14 @@ export class GameManager {
     }
 
     reset() {
+        // Stop previous loop to prevent duplication
+        if (this.reqId) {
+            cancelAnimationFrame(this.reqId);
+            this.reqId = null;
+        }
+
         this.gameOver = false;
+        this.isPaused = false;
         this.spirit.hp = GAME_SETTINGS.SPIRIT_HP;
         this.init();
     }
@@ -279,6 +310,7 @@ export class GameManager {
     }
 
     startNextTurn() {
+        this.turnCount++; // Increment survival counter
         this.timeLeft = GAME_SETTINGS.TURN_TIME_LIMIT;
         this.currentAP = GAME_SETTINGS.PLAYER_AP;
         this.turn = 'PLAYER';
@@ -316,6 +348,10 @@ export class GameManager {
         return false;
     }
 
+    setScreenManager(screenManager) {
+        this.screenManager = screenManager;
+    }
+
     endGame(win, msg) {
         if (this.gameOver) return; // Prevent double trigger
         this.gameOver = true;
@@ -325,7 +361,11 @@ export class GameManager {
         this.spirit.visible = true;
 
         this.renderer.draw(this.gridSystem, this.player, this.spirit, 0);
-        this.uiManager.showGameOver(msg, win);
+        // this.uiManager.showGameOver(msg, win); // Deprecated by ScreenManager Video
+
+        if (this.screenManager) {
+            this.screenManager.showGameOverVideo(this.turnCount, win);
+        }
     }
 
     updateEnvironment() {
