@@ -16,7 +16,20 @@
 
     <!-- 2️⃣ 教程界面 (Tutorial Screen) -->
     <div id="tutorial-screen" class="screen-overlay">
-        <img src="images/GameTutorial.jpg" alt="Game Tutorial" class="fullscreen-image">
+        <div class="tutorial-container">
+            <div class="tutorial-content-overlay">
+                <h2>游戏指南</h2>
+                <ul>
+                    <li><strong>生存:</strong> 3秒一个回合，尽可能长时间存活，打破生存回合数纪录即为胜利。</li>
+                    <li><strong>移动:</strong> <span class="key">W</span><span class="key">A</span><span
+                            class="key">S</span><span class="key">D</span> 移动，鼠标控制视角。</li>
+                    <li><strong>交互:</strong> 每回合1次鼠标左键开门，每次进入新房间，灯都会按照一定规律亮或者灭。</li>
+                    <li><strong>扫描:</strong> 按 <span class="key">F</span> 扫描恶灵位置（次数有限）。</li>
+                    <li><strong>警告:</strong> 恶灵只会在黑暗房间中移动并追杀你，躲开她！</li>
+                </ul>
+            </div>
+            <button id="start-game-btn" class="tutorial-btn">开始潜行 &gt;</button>
+        </div>
     </div>
 
     <!-- 3️⃣ 游戏界面 (Game Screen) -->
@@ -43,14 +56,6 @@
                     </div>
 
                     <div class="controls-area">
-                        <div class="d-pad">
-                            <div class="d-up hover-sound" data-key="ArrowUp"></div>
-                            <div class="d-left hover-sound" data-key="ArrowLeft"></div>
-                            <div class="d-center"></div>
-                            <div class="d-right hover-sound" data-key="ArrowRight"></div>
-                            <div class="d-down hover-sound" data-key="ArrowDown"></div>
-                        </div>
-
                         <div class="btn-wrapper">
                             <button class="big-btn hover-sound" data-key="Reveal"></button>
                             <span class="label">SCAN (3)</span>
@@ -83,6 +88,11 @@
     <!-- 4️⃣ 游戏结束视频界面 (Game Over Video Screen) -->
     <div id="gameover-video-screen" class="screen-overlay">
         <video id="gameover-video" class="fullscreen-video" src="videos/GameOver.mp4"></video>
+    </div>
+
+    <!-- 4.5️⃣ 胜利界面 (Victory Screen) -->
+    <div id="victory-screen" class="screen-overlay">
+        <img src="videos/survived.png" alt="You Survived" class="fullscreen-image">
     </div>
 
     <!-- 5️⃣ 游戏结束统计界面 (Game Over Stats Screen) -->

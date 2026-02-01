@@ -4,8 +4,9 @@ import { GRID_SIZE, GAME_SETTINGS } from './Config.js';
 import { UIManager } from './UIManager.js';
 
 export class GameManager {
-    constructor(renderer) {
+    constructor(renderer, audioManager) {
         this.renderer = renderer;
+        this.audioManager = audioManager;
         this.uiManager = new UIManager();
         this.gridSystem = new GridSystem();
         this.player = new Player(GAME_SETTINGS.PLAYER_START.x, GAME_SETTINGS.PLAYER_START.y);
@@ -13,6 +14,7 @@ export class GameManager {
 
         this.turn = 'PLAYER'; // PLAYER -> SPIRIT -> RESOLVE
         this.gameOver = false;
+        this.wasDanger = false;
 
         // Timer & AP System
         this.timeLeft = GAME_SETTINGS.TURN_TIME_LIMIT;
@@ -39,9 +41,16 @@ export class GameManager {
         this.player.y = GAME_SETTINGS.PLAYER_START.y;
         this.placeSpirit();
 
+        // Audio
+        if (this.audioManager) {
+            this.audioManager.stopAll(); // Safety reset
+            this.audioManager.playBgm();
+        }
+
         // Reset State
         this.timeLeft = GAME_SETTINGS.TURN_TIME_LIMIT;
         this.currentAP = GAME_SETTINGS.PLAYER_AP;
+        this.wasDanger = false;
 
         this.uiManager.updateAP(this.currentAP);
         this.checkDanger();
@@ -122,6 +131,11 @@ export class GameManager {
 
     setRaycaster(raycaster) {
         this.raycaster = raycaster;
+        // Inject Audio Manager to Raycaster here
+        if (this.audioManager) {
+            this.raycaster.setAudioManager(this.audioManager);
+        }
+
         // Initial sync
         this.raycaster.updateLightMap(this.gridSystem);
 
@@ -172,9 +186,9 @@ export class GameManager {
             return;
         }
 
-        // Force Reveal(Debug Only)
+        // Reveal (Consume Scan count)
         if (key === 'f' || key === 'F') {
-            this.forceReaval();
+            this.triggerReveal();
             return;
         }
 
@@ -233,17 +247,7 @@ export class GameManager {
         }, GAME_SETTINGS.SPIRIT_REVEAL_DURATION);
     }
 
-    forceReaval() {
-        if (this.spirit.visible) return; // Already visible
 
-        this.spirit.visible = true;
-        // Auto Hide
-        setTimeout(() => {
-            if (!this.gameOver) {
-                this.spirit.visible = false;
-            }
-        }, GAME_SETTINGS.SPIRIT_REVEAL_DURATION);
-    }
 
     reset() {
         // Stop previous loop to prevent duplication
@@ -323,11 +327,19 @@ export class GameManager {
 
     checkDanger() {
         const dist = Math.abs(this.player.x - this.spirit.x) + Math.abs(this.player.y - this.spirit.y);
-        if (dist <= 1 && this.spirit.hp > 0) {
+        const isDanger = (dist <= 1 && this.spirit.hp > 0);
+
+        if (isDanger) {
             this.uiManager.updateStatus("DANGER", true);
+            // Play Audio if newly entering danger
+            if (!this.wasDanger && this.audioManager) {
+                this.audioManager.playAlert();
+            }
         } else {
             this.uiManager.updateStatus("SAFE", false);
         }
+
+        this.wasDanger = isDanger;
     }
 
     // Centralized State Checker
@@ -354,8 +366,54 @@ export class GameManager {
 
     endGame(win, msg) {
         if (this.gameOver) return; // Prevent double trigger
+
+        // --- Victory Condition Check: Survival Record ---
+        // Get previous record
+        let highScore = 0;
+        try {
+            highScore = parseInt(localStorage.getItem('survival_record') || '0', 10);
+        } catch (e) {
+            console.warn("Storage access failed", e);
+        }
+
+        let isMercy = false;
+        // If we survived longer than a non-zero record, the Spirit grants mercy
+        if (this.turnCount > highScore && highScore > 0) {
+            if (!win) {
+                isMercy = true;
+                win = true; // Override to WIN
+                msg = "NEW RECORD! MERCY GRANTED";
+            }
+        }
+
+        // Update Record if beaten
+        if (this.turnCount > highScore) {
+            try {
+                localStorage.setItem('survival_record', this.turnCount);
+                console.log(`New Record Set: ${this.turnCount}`);
+            } catch (e) { }
+        }
+        // ------------------------------------------------
+
         this.gameOver = true;
         this.turn = 'GAMEOVER';
+
+        // Audio Handling
+        if (this.audioManager) {
+            this.audioManager.stopBgm();
+            if (!win) {
+                this.audioManager.playDie();
+            } else {
+                // Determine if we should play specific win sound? 
+                // For Mercy, maybe silence or a specific chime?
+                // Currently no win sound, so just silence BGM is fine.
+            }
+        }
+
+        // Release Cursor Lock
+        if (this.raycaster) {
+            this.raycaster.unlockPointer();
+        }
 
         // Force Reveal on Game Over
         this.spirit.visible = true;

@@ -2,15 +2,17 @@ import { GameManager } from './GameManager.js';
 import { Renderer } from './Renderer.js';
 import { Raycaster } from './Raycaster.js';
 import { ScreenManager } from './ScreenManager.js';
-import { UIManager } from './UIManager.js'; // Ensure UIManager is imported if needed, though ScreenManager creates one? No, ScreenManager takes one.
+import { UIManager } from './UIManager.js';
+import { AudioManager } from './AudioManager.js';
 
 window.onload = () => {
     // 1. Core Systems
     const renderer = new Renderer();
     const uiManager = new UIManager(); // Create UIManager explicitly
+    const audioManager = new AudioManager();
 
     // 2. Game Logic (But don't start loop yet)
-    const game = new GameManager(renderer);
+    const game = new GameManager(renderer, audioManager);
     // Note: game.init() calls gridSystem.init(), which we needed for Raycaster.
     // However, since we want ScreenManager to handle the "Start", we can either let it run 
     // or manually init gridSystem just for Raycaster setup.

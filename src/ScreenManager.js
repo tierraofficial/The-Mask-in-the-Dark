@@ -16,6 +16,7 @@ export class ScreenManager {
         this.tutorialScreenEl = document.getElementById('tutorial-screen');
         this.gameScreenEl = document.getElementById('game-screen');
         this.gameOverVideoScreenEl = document.getElementById('gameover-video-screen');
+        this.victoryScreenEl = document.getElementById('victory-screen');
         this.gameOverStatsScreenEl = document.getElementById('gameover-stats-screen');
         this.gameOverVideoEl = document.getElementById('gameover-video');
 
@@ -31,9 +32,12 @@ export class ScreenManager {
             });
         }
 
-        // 教程界面：点击任意位置进入游戏
-        if (this.tutorialScreenEl) {
-            this.tutorialScreenEl.addEventListener('click', () => {
+        // 教程界面：点击按钮进入游戏
+        const startGameBtn = document.getElementById('start-game-btn');
+        if (startGameBtn) {
+            startGameBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 this.showGameScreen();
             });
         }
@@ -42,6 +46,13 @@ export class ScreenManager {
         if (this.gameOverVideoEl) {
             this.gameOverVideoEl.addEventListener('ended', () => {
                 this._onVideoEnded();
+            });
+        }
+
+        // 胜利界面：点击任意位置进入统计
+        if (this.victoryScreenEl) {
+            this.victoryScreenEl.addEventListener('click', () => {
+                this._onVideoEnded(); // Re-use stats transition
             });
         }
 
@@ -122,24 +133,37 @@ export class ScreenManager {
      */
     showGameOverVideo(turnCount, isWin) {
         this._hideAllScreens();
-        if (this.gameOverVideoScreenEl) {
-            this.gameOverVideoScreenEl.classList.add('active');
-        }
 
         this.turnCount = turnCount;
         this.isWin = isWin;
-        this.currentScreen = 'gameover-video';
+        console.log(`Screen: GAMEOVER (Turns: ${turnCount}, Win: ${isWin})`);
 
-        // 重置视频并播放
-        if (this.gameOverVideoEl) {
-            this.gameOverVideoEl.currentTime = 0;
-            this.gameOverVideoEl.play().catch(e => {
-                console.warn("Auto-play blocked, skipping directly to stats", e);
-                this._onVideoEnded();
-            });
+        if (isWin) {
+            // Show Victory Image
+            if (this.victoryScreenEl) {
+                this.victoryScreenEl.classList.add('active');
+                this.currentScreen = 'victory';
+                // Optional: Auto-advance after N seconds OR just wait for click
+                // setTimeout(() => this._onVideoEnded(), 5000); 
+            } else {
+                this._onVideoEnded(); // Fallback
+            }
+        } else {
+            // Show Game Over Video
+            if (this.gameOverVideoScreenEl) {
+                this.gameOverVideoScreenEl.classList.add('active');
+            }
+            this.currentScreen = 'gameover-video';
+
+            // 重置视频并播放
+            if (this.gameOverVideoEl) {
+                this.gameOverVideoEl.currentTime = 0;
+                this.gameOverVideoEl.play().catch(e => {
+                    console.warn("Auto-play blocked, skipping directly to stats", e);
+                    this._onVideoEnded();
+                });
+            }
         }
-
-        console.log(`Screen: GAMEOVER VIDEO (Turns: ${turnCount}, Win: ${isWin})`);
     }
 
     /**
@@ -166,7 +190,8 @@ export class ScreenManager {
         const resultEl = document.getElementById('gameover-result');
 
         if (turnCountEl) {
-            turnCountEl.innerText = `Survival Rounds: ${this.turnCount}`;
+            const highScore = parseInt(localStorage.getItem('survival_record') || '0', 10);
+            turnCountEl.innerHTML = `Survival: ${this.turnCount}<br><span style="font-size:0.8em;opacity:0.7">Record: ${highScore}</span>`;
         }
 
         if (resultEl) {
@@ -207,6 +232,7 @@ export class ScreenManager {
             this.tutorialScreenEl,
             this.gameScreenEl,
             this.gameOverVideoScreenEl,
+            this.victoryScreenEl,
             this.gameOverStatsScreenEl
         ];
 

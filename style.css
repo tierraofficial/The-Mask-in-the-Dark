@@ -37,12 +37,16 @@ body {
     height: 100%;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
+    /* Move to top */
+    padding-top: 25px;
+    /* Matches horizontal margin */
 
-    /* Background Pattern from Legacy */
-    background-color: #555;
-    background-image: radial-gradient(#666 10%, transparent 10%),
-        radial-gradient(#666 10%, transparent 10%);
+    /* Background Pattern */
+    background-color: #706b51;
+    background-image:
+        radial-gradient(rgba(0, 0, 0, 0.1) 10%, transparent 10%),
+        radial-gradient(rgba(0, 0, 0, 0.1) 10%, transparent 10%);
     background-size: 20px 20px;
     background-position: 0 0, 10px 10px;
 
@@ -180,7 +184,7 @@ canvas#gameCanvas {
     flex: 1;
     display: flex;
     align-items: center;
-    justify-content: space-around;
+    justify-content: center;
     padding-bottom: 20px;
 }
 
@@ -487,4 +491,213 @@ canvas#gameCanvas {
 
 .gameover-btn:active {
     transform: translateY(0);
+}
+
+/* --- Tutorial Popup --- */
+.tutorial-container {
+    background: #1a1a1a;
+    width: 600px;
+    max-width: 90%;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid #333;
+}
+
+.tutorial-img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-bottom: 2px solid #333;
+}
+
+.tutorial-text {
+    padding: 20px 30px;
+    color: #eee;
+    font-family: sans-serif;
+    /* Readable font for rules */
+}
+
+.tutorial-text h2 {
+    margin: 0 0 15px 0;
+    color: #ffd700;
+    font-size: 1.5rem;
+    border-bottom: 1px solid #444;
+    padding-bottom: 10px;
+}
+
+.tutorial-text ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    line-height: 1.8;
+}
+
+.tutorial-text li {
+    margin-bottom: 8px;
+    font-size: 1rem;
+}
+
+.tutorial-text strong {
+    color: #fdfdca;
+    margin-right: 5px;
+}
+
+.tutorial-text .key {
+    display: inline-block;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin: 0 2px;
+    font-family: monospace;
+    font-size: 0.9em;
+    box-shadow: 0 2px 0 #111;
+}
+
+.tutorial-btn {
+    margin: 10px 30px 30px;
+    padding: 12px;
+    background: linear-gradient(#c95555, #8a2020);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    transition: transform 0.1s, filter 0.2s;
+}
+
+.tutorial-btn:hover {
+    filter: brightness(1.2);
+    transform: translateY(-1px);
+}
+
+.tutorial-btn:active {
+    transform: translateY(1px);
+}
+
+/* --- Updated Tutorial Popup (Image Background) --- */
+/* --- Updated Tutorial Popup (Paper Style) --- */
+.tutorial-container {
+    background-image: url('images/1.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    width: 2200px;
+    height: 1800px;
+    /* Double size again */
+    max-width: 95%;
+    /* Remove borders and shadows from box to let image shape start out, 
+       but if image has transparency, this div is rectangular. 
+       Let's keep it simple: assume image fits well. */
+    border: none;
+    box-shadow: none;
+    background-color: transparent;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 60px 80px;
+    /* Safe area for text inside paper */
+    box-sizing: border-box;
+    transform: translateX(-40px);
+    /* Adjust position left */
+}
+
+.tutorial-content-overlay {
+    background: transparent;
+    /* No overlay */
+    padding: 0;
+    color: #2a1a10;
+    /* Dark Brown Ink Color */
+    font-family: 'Courier New', Courier, serif;
+    /* Typewriter/Paper feel */
+    text-shadow: 0 0 1px rgba(0, 0, 0, 0.1);
+    border: none;
+    backdrop-filter: none;
+    text-align: center;
+    width: 100%;
+}
+
+.tutorial-content-overlay h2 {
+    margin: 0 0 20px 0;
+    color: #8b0000;
+    /* Blood Red Title */
+    font-size: 2rem;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #5d4037;
+    font-weight: bold;
+    transform: rotate(-2deg);
+    /* Slight handcrafted feel */
+}
+
+.tutorial-content-overlay ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    line-height: 1.8;
+    text-align: left;
+    display: inline-block;
+    /* Center the block of left-aligned text */
+}
+
+.tutorial-content-overlay li {
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+/* Hide strong tags or make them just bolder */
+.tutorial-content-overlay strong {
+    color: #000;
+    margin-right: 5px;
+    text-decoration: underline;
+}
+
+.tutorial-content-overlay .key {
+    display: inline-block;
+    background: transparent;
+    border: 2px solid #2a1a10;
+    border-radius: 4px;
+    padding: 0 6px;
+    margin: 0 2px;
+    font-family: inherit;
+    font-size: 0.9em;
+    color: #2a1a10;
+    box-shadow: none;
+    font-weight: 900;
+}
+
+.tutorial-btn {
+    margin-top: 30px;
+    width: auto;
+    border-radius: 0;
+    padding: 10px 40px;
+    background: transparent;
+    color: #8b0000;
+    border: 3px solid #8b0000;
+    font-family: 'Courier New', Courier, serif;
+    font-weight: 900;
+    font-size: 1.5rem;
+    transform: rotate(2deg);
+    cursor: pointer;
+    box-shadow: none;
+    transition: transform 0.2s, color 0.2s, background 0.2s;
+}
+
+.tutorial-btn:hover {
+    background: #8b0000;
+    color: #fdfdca;
+    transform: rotate(0deg) scale(1.1);
+}
+
+.tutorial-btn:active {
+    transform: scale(0.95);
 }

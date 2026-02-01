@@ -1,4 +1,4 @@
-import { GAME_SETTINGS } from './Config.js';
+import { GAME_SETTINGS, RENDER_3D_SETTINGS } from './Config.js';
 /**
  * Raycaster Engine Module
  * Extracted from raycasting_demo.html
@@ -13,7 +13,7 @@ export class Raycaster {
         this.width = 0; // Set in resize
         this.height = 0;
         this.MAP_SIZE = 42;
-        this.TEX_SIZE = 512;
+        this.TEX_SIZE = 128;
         this.WALL_HEIGHT_SCALE = 3.0;
         this.CELL_SIZE = 8;
         this.GRID_OFFSET = 1;
@@ -32,8 +32,8 @@ export class Raycaster {
             y: 1 + 2 * 8 + 4.0,
             dirX: 0, dirY: -1,
             planeX: -0.80, planeY: 0,
-            rotSpeed: 0.002,
-            moveSpeed: 0.08
+            rotSpeed: GAME_SETTINGS.MOUSE_SENSITIVITY,
+            moveSpeed: GAME_SETTINGS.MOVE_SPEED
         };
 
         this.keys = { w: false, a: false, s: false, d: false };
@@ -42,9 +42,9 @@ export class Raycaster {
         this.lighting = {
             targetLevel: 1.0,
             currentLevel: 1.0,
-            minBrightness: 0.1,
-            brightFogDist: 15.0,
-            darkFogDist: 4.0
+            minBrightness: RENDER_3D_SETTINGS.MIN_BRIGHTNESS,
+            brightFogDist: RENDER_3D_SETTINGS.BRIGHT_FOG_DIST,
+            darkFogDist: RENDER_3D_SETTINGS.DARK_FOG_DIST
         };
 
         this.game = {
@@ -64,6 +64,10 @@ export class Raycaster {
             room: document.getElementById('rc-room'),
             door: document.getElementById('rc-door')
         };
+    }
+
+    setAudioManager(audioManager) {
+        this.audioManager = audioManager;
     }
 
     init(gridSystem) {
@@ -251,6 +255,12 @@ export class Raycaster {
         });
     }
 
+    unlockPointer() {
+        if (document.pointerLockElement === this.canvas) {
+            document.exitPointerLock();
+        }
+    }
+
     rotateCamera(angle) {
         const oldDirX = this.player.dirX;
         const oldPlaneX = this.player.planeX;
@@ -362,6 +372,7 @@ export class Raycaster {
                 if (door && (door.state === 'CLOSED' || door.state === 'CLOSING')) {
                     door.state = 'OPENING';
                     this.game.doorCooldown = this.game.maxCooldown;
+                    if (this.audioManager) this.audioManager.playDoor();
                 }
             }
         }
@@ -418,6 +429,8 @@ export class Raycaster {
         const collide = (x, y) => checkCollision(x, y) || checkCollision(x + r, y) || checkCollision(x - r, y) || checkCollision(x, y + r) || checkCollision(x, y - r);
 
         const p = this.player;
+        const pX = p.x;
+        const pY = p.y;
         if (this.keys.w) {
             const nx = p.x + p.dirX * p.moveSpeed;
             if (!collide(nx, p.y)) p.x = nx;
@@ -441,6 +454,11 @@ export class Raycaster {
             if (!collide(nx, p.y)) p.x = nx;
             const ny = p.y + p.dirX * p.moveSpeed;
             if (!collide(p.x, ny)) p.y = ny;
+        }
+
+        // Footstep Audio
+        if ((this.player.x !== pX || this.player.y !== pY) && this.audioManager) {
+            this.audioManager.playFootstep();
         }
     }
 
