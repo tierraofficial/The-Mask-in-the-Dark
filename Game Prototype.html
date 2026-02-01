@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lights Out (熄灯游戏)</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --device-color: #2d2d2d;
+            --button-off: #4a4a4a;
+            --button-on: #f0f0f0;
+            --button-on-glow: #ffffff;
+            --text-color: #e0e0e0;
+            --lcd-bg: #8c9c86;
+            --lcd-text: #1a2b1a;
+            --cursor-color: #00ffff;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+
+        /* Device Casing mimicking the 1995 handheld */
+        .device-case {
+            background-color: var(--device-color);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow:
+                0 10px 20px rgba(0, 0, 0, 0.5),
+                inset 0 2px 5px rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 95vw;
+        }
+
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .brand {
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            font-style: italic;
+            font-size: 1.5rem;
+            color: #ccc;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        /* LCD Display for Moves/Status */
+        .lcd-display {
+            background-color: var(--lcd-bg);
+            color: var(--lcd-text);
+            font-family: 'Digital-7', monospace;
+            padding: 10px 20px;
+            border-radius: 5px;
+            box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.2);
+            min-width: 120px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            border: 2px solid #555;
+            margin-bottom: 20px;
+        }
+
+        /* Game Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            background-color: #222;
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #444;
+            box-shadow: inset 0 0 10px #000;
+            position: relative;
+        }
+
+        .cell {
+            width: 50px;
+            height: 50px;
+            background-color: var(--button-off);
+            border-radius: 8px;
+            cursor: pointer;
+            /* Change transition:
+               We delay background-color change slightly to sync with the flip animation (at 90deg).
+               Transform transition is kept fast for button presses, but animation overrides it.
+            */
+            transition:
+                background-color 0.05s 0.15s,
+                /* Wait 150ms (half of 300ms flip) to change color */
+                box-shadow 0.05s 0.15s,
+                /* Sync shadow with color */
+                transform 0.1s;
+            box-shadow:
+                0 4px 0 #2a2a2a,
+                0 5px 5px rgba(0, 0, 0, 0.3);
+            position: relative;
+            box-sizing: border-box;
+            /* Important for 3D flip effect */
+            transform-style: preserve-3d;
+        }
+
+        .cell:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #2a2a2a, inset 0 2px 5px rgba(0, 0, 0, 0.5);
+            transition-delay: 0s;
+            /* Instant feedback on press */
+        }
+
+        /* Lit State */
+        .cell.is-on {
+            background-color: var(--button-on);
+            box-shadow:
+                0 0 15px var(--button-on),
+                0 4px 0 #999999,
+                0 5px 5px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--button-on-glow);
+        }
+
+        .cell.is-on:active {
+            box-shadow: 0 0 10px var(--button-on), inset 0 2px 5px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Cursor State (Player Position) */
+        .cell.cursor {
+            outline: 4px solid var(--cursor-color);
+            outline-offset: 2px;
+            z-index: 10;
+        }
+
+        /* Flip Animation 
+           Rotates X axis to simulate top-down flip.
+           At 50% (90deg), the element is perpendicular to viewer (invisible-ish),
+           which is perfect for swapping the color.
+        */
+        @keyframes flip-vertical {
+            0% {
+                transform: perspective(400px) rotateX(0);
+            }
+
+            50% {
+                transform: perspective(400px) rotateX(-90deg);
+            }
+
+            100% {
+                transform: perspective(400px) rotateX(0);
+            }
+        }
+
+        .cell.flipping {
+            animation: flip-vertical 0.3s ease-in-out;
+        }
+
+        /* Controls Area */
+        .controls {
+            margin-top: 25px;
+            display: flex;
+            gap: 15px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            transition: transform 0.1s;
+            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        .btn-new {
+            background-color: #ffcc00;
+            color: #333;
+        }
+
+        .btn-reset {
+            background-color: #444;
+            color: #fff;
+        }
+
+        .instruction {
+            margin-top: 20px;
+            color: #888;
+            font-size: 0.9rem;
+            text-align: center;
+            max-width: 320px;
+            line-height: 1.4;
+        }
+
+        .key-badge {
+            display: inline-block;
+            background: #444;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-family: monospace;
+            border: 1px solid #666;
+        }
+
+        @media (max-width: 400px) {
+            .cell {
+                width: 40px;
+                height: 40px;
+            }
+
+            .grid {
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="device-case">
+        <div class="header">
+            <div class="brand">LIGHTS OUT</div>
+        </div>
+
+        <div class="lcd-display" id="statusDisplay">MOVES: 0</div>
+
+        <div class="grid" id="gameGrid">
+            <!-- Grid generated by JS -->
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-new" onclick="startNewGame()">新游戏</button>
+            <button class="btn btn-reset" onclick="resetLevel()">重置本关</button>
+        </div>
+
+        <div class="instruction">
+            <p>移动: <span class="key-badge">W</span><span class="key-badge">A</span><span class="key-badge">S</span><span
+                    class="key-badge">D</span> 或方向键</p>
+            <p>机制: <span class="key-badge">移动即触发反转</span></p>
+            <p>目标：熄灭所有红灯。</p>
+        </div>
+    </div>
+
+    <script>
+        const GRID_SIZE = 5;
+        let board = [];
+        let initialBoard = [];
+        let moves = 0;
+        let isGameWon = false;
+
+        let cursorPos = { r: 2, c: 2 };
+
+        const gridElement = document.getElementById('gameGrid');
+        const statusDisplay = document.getElementById('statusDisplay');
+
+        function createGridUI() {
+            gridElement.innerHTML = '';
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+
+                    cell.addEventListener('click', () => {
+                        cursorPos = { r, c };
+                        handleMove(r, c);
+                    });
+
+                    gridElement.appendChild(cell);
+                }
+            }
+        }
+
+        function toggleState(r, c) {
+            if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+                board[r][c] = !board[r][c];
+            }
+        }
+
+        // Helper to get DOM element
+        function getCell(r, c) {
+            return document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
+        }
+
+        function handleMove(r, c) {
+            if (isGameWon) return;
+
+            // Identify affected cells for animation
+            const affected = [
+                { r: r, c: c },
+                { r: r - 1, c: c },
+                { r: r + 1, c: c },
+                { r: r, c: c - 1 },
+                { r: r, c: c + 1 }
+            ];
+
+            // Apply animation to DOM elements
+            affected.forEach(pos => {
+                if (pos.r >= 0 && pos.r < GRID_SIZE && pos.c >= 0 && pos.c < GRID_SIZE) {
+                    const el = getCell(pos.r, pos.c);
+                    if (el) {
+                        // Reset animation to allow re-triggering immediately
+                        el.classList.remove('flipping');
+                        // Force reflow
+                        void el.offsetWidth;
+                        // Add animation class
+                        el.classList.add('flipping');
+                    }
+                }
+            });
+
+            // Update Logic
+            toggleState(r, c);
+            toggleState(r - 1, c);
+            toggleState(r + 1, c);
+            toggleState(r, c - 1);
+            toggleState(r, c + 1);
+
+            moves++;
+            updateUI();
+            checkWin();
+        }
+
+        function moveCursor(dr, dc) {
+            const newR = cursorPos.r + dr;
+            const newC = cursorPos.c + dc;
+
+            if (newR >= 0 && newR < GRID_SIZE && newC >= 0 && newC < GRID_SIZE) {
+                cursorPos.r = newR;
+                cursorPos.c = newC;
+                handleMove(newR, newC);
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].indexOf(e.code) > -1) {
+                e.preventDefault();
+            }
+
+            if (isGameWon) return;
+
+            switch (e.key.toLowerCase()) {
+                case 'w':
+                case 'arrowup':
+                    moveCursor(-1, 0);
+                    break;
+                case 's':
+                case 'arrowdown':
+                    moveCursor(1, 0);
+                    break;
+                case 'a':
+                case 'arrowleft':
+                    moveCursor(0, -1);
+                    break;
+                case 'd':
+                case 'arrowright':
+                    moveCursor(0, 1);
+                    break;
+            }
+        });
+
+        function checkWin() {
+            let allOff = true;
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (board[r][c]) {
+                        allOff = false;
+                        break;
+                    }
+                }
+            }
+
+            if (allOff) {
+                isGameWon = true;
+                statusDisplay.style.backgroundColor = '#90EE90';
+                statusDisplay.innerText = "YOU WIN!";
+            }
+        }
+
+        function updateUI() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                const r = parseInt(cell.dataset.row);
+                const c = parseInt(cell.dataset.col);
+
+                if (board[r][c]) {
+                    cell.classList.add('is-on');
+                } else {
+                    cell.classList.remove('is-on');
+                }
+
+                if (r === cursorPos.r && c === cursorPos.c) {
+                    cell.classList.add('cursor');
+                } else {
+                    cell.classList.remove('cursor');
+                }
+            });
+
+            if (!isGameWon) {
+                statusDisplay.innerText = `MOVES: ${moves}`;
+                statusDisplay.style.backgroundColor = '#8c9c86';
+            }
+        }
+
+        function startNewGame() {
+            board = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(false));
+
+            const scrambleMoves = 20 + Math.floor(Math.random() * 20);
+
+            // Apply logic directly without animation for setup
+            for (let i = 0; i < scrambleMoves; i++) {
+                const r = Math.floor(Math.random() * GRID_SIZE);
+                const c = Math.floor(Math.random() * GRID_SIZE);
+
+                toggleState(r, c);
+                toggleState(r - 1, c);
+                toggleState(r + 1, c);
+                toggleState(r, c - 1);
+                toggleState(r, c + 1);
+            }
+
+            initialBoard = board.map(row => [...row]);
+
+            moves = 0;
+            isGameWon = false;
+            cursorPos = { r: 2, c: 2 };
+            updateUI();
+
+            // Remove any leftover animation classes from previous game
+            document.querySelectorAll('.cell').forEach(c => c.classList.remove('flipping'));
+        }
+
+        function resetLevel() {
+            board = initialBoard.map(row => [...row]);
+            moves = 0;
+            isGameWon = false;
+            updateUI();
+            document.querySelectorAll('.cell').forEach(c => c.classList.remove('flipping'));
+        }
+
+        createGridUI();
+        startNewGame();
+
+    </script>
+</body>
+
+</html>
