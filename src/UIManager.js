@@ -13,7 +13,7 @@ export class UIManager {
 
     updateAP(ap) {
         if (this.apDisplay) {
-            this.apDisplay.innerText = `AP: ${ap}`;
+            this.apDisplay.innerText = `ROUND: ${ap}`;
         }
     }
 

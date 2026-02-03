@@ -59,6 +59,7 @@ export class GameManager {
         this.turnCount = 0;
         this.turn = 'PLAYER';
         this.spirit.visible = false; // Reset Visibility on Restart
+        this.scanUsedThisTurn = false; // Track SCAN usage per turn
 
         // Reset UI Label
         const btnLabel = document.querySelector('.btn-wrapper .label');
@@ -66,14 +67,7 @@ export class GameManager {
 
         // Force Raycaster Re-init (Rebuild Map/Textures)
         if (this.raycaster) {
-            // We need to re-run initMap mostly, but init() does it all.
-            // Careful not to double-bind listeners, but Raycaster.init handles that?
-            // Actually Raycaster.init binds listeners every time. That's bad.
-            // Let's create a reInitMap method in Raycaster or just call initMap.
-            // For now, let's look at Raycaster.js. 
-            // Raycaster.init calls initMap. 
-            // Let's assume Raycaster needs a hard reset method.
-            // For this step, I'll just trigger map update.
+
             this.raycaster.initMap(this.gridSystem);
 
             // Reset Player Position in Raycaster to match new Grid
@@ -172,7 +166,10 @@ export class GameManager {
             // 5. Check Environment
             if (this.checkGameState()) return;
 
-            // 6. WAIT FOR TIMER (No Spirit Turn here)
+            // 6. Update Danger Status (immediately after moving to new room)
+            this.checkDanger();
+
+            // 7. WAIT FOR TIMER (No Spirit Turn here)
             console.log(`Action Taken. AP: ${this.currentAP}`);
         }
     }
@@ -230,10 +227,38 @@ export class GameManager {
     triggerReveal() {
         if (this.revealCount >= GAME_SETTINGS.SPIRIT_REVEAL_LIMIT) return;
         if (this.spirit.visible) return; // Already visible
+        if (this.scanUsedThisTurn) return; // Already used this turn
 
         console.log("SCANNING...");
         this.revealCount++;
         this.spirit.visible = true;
+        this.scanUsedThisTurn = true;
+
+        // Update button visual state
+        this.updateScanButtonState();
+
+        // Fix: Force complete current animation before new movement
+        // This ensures spirit always moves from grid positions, not mid-animation
+        if (this.renderer) {
+            this.renderer.spiritAnimX = this.renderer.spiritTargetX;
+            this.renderer.spiritAnimY = this.renderer.spiritTargetY;
+        }
+
+        // Spirit reacts to SCAN by moving immediately
+        const result = this.spirit.act(this.player, this.gridSystem);
+
+        // Handle spirit actions (similar to resolveTurn logic)
+        if (result && result.action === 'STUCK') {
+            const target = this.gridSystem.corruptRandomLight();
+            if (target && this.renderer) this.renderer.triggerWarning(target.x, target.y);
+        }
+        else if (result && result.action === 'CORRUPT') {
+            this.gridSystem.corruptLightAt(result.target.x, result.target.y);
+            if (this.renderer) this.renderer.triggerWarning(result.target.x, result.target.y);
+        }
+
+        // Check if spirit caught player during SCAN movement
+        if (this.checkGameState()) return;
 
         // Update Button UI
         const btnLabel = document.querySelector('.btn-wrapper .label');
@@ -321,9 +346,13 @@ export class GameManager {
         this.timeLeft = GAME_SETTINGS.TURN_TIME_LIMIT;
         this.currentAP = GAME_SETTINGS.PLAYER_AP;
         this.turn = 'PLAYER';
+        this.scanUsedThisTurn = false; // Reset SCAN availability
 
         this.uiManager.updateScore(this.gridSystem.lightCount);
         this.uiManager.updateAP(this.currentAP);
+
+        // Update SCAN button state
+        this.updateScanButtonState();
 
         this.checkDanger();
     }
@@ -435,6 +464,16 @@ export class GameManager {
     }
 
 
+    updateScanButtonState() {
+        const scanBtn = document.querySelector('.big-btn');
+        if (scanBtn) {
+            if (this.scanUsedThisTurn || this.revealCount >= GAME_SETTINGS.SPIRIT_REVEAL_LIMIT) {
+                scanBtn.classList.add('disabled');
+            } else {
+                scanBtn.classList.remove('disabled');
+            }
+        }
+    }
 
     draw() {
         this.updateEnvironment();

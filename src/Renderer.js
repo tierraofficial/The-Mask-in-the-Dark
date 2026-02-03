@@ -11,6 +11,12 @@ export class Renderer {
 
         // Warning States: 2D array for Red Flash (0.0 to 1.0)
         this.warningStates = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
+
+        // Spirit Animation State
+        this.spiritAnimX = 0;
+        this.spiritAnimY = 0;
+        this.spiritTargetX = 0;
+        this.spiritTargetY = 0;
     }
 
     triggerWarning(x, y) {
@@ -169,6 +175,26 @@ export class Renderer {
         // Actually, let's just use the visibility flag.
 
         if (spirit && spirit.hp > 0 && spirit.visible) {
+            // Fix: On first reveal, immediately sync animation position (no jump from 0,0)
+            if (this.spiritTargetX === 0 && this.spiritTargetY === 0) {
+                this.spiritAnimX = spirit.x;
+                this.spiritAnimY = spirit.y;
+                this.spiritTargetX = spirit.x;
+                this.spiritTargetY = spirit.y;
+            }
+
+            // Update animation target if spirit moved
+            if (spirit.x !== this.spiritTargetX || spirit.y !== this.spiritTargetY) {
+                this.spiritTargetX = spirit.x;
+                this.spiritTargetY = spirit.y;
+            }
+
+            // Smooth lerp animation (0.5s ~ 500ms)
+            // Using lerp factor of 0.1 per frame (~60fps) gives ~0.5s transition
+            const lerpFactor = 0.1;
+            this.spiritAnimX += (this.spiritTargetX - this.spiritAnimX) * lerpFactor;
+            this.spiritAnimY += (this.spiritTargetY - this.spiritAnimY) * lerpFactor;
+
             this.ctx.save();
             this.ctx.fillStyle = COLORS.SPIRIT;
 
@@ -176,9 +202,9 @@ export class Renderer {
             this.ctx.shadowBlur = 10;
             this.ctx.shadowColor = 'rgba(255, 68, 68, 0.6)';
 
-            // Mirror X
-            const sX = (GRID_SIZE - 1 - spirit.x) * TILE_SIZE + TILE_SIZE / 2;
-            const sY = spirit.y * TILE_SIZE + TILE_SIZE / 2;
+            // Mirror X (use animated position)
+            const sX = (GRID_SIZE - 1 - this.spiritAnimX) * TILE_SIZE + TILE_SIZE / 2;
+            const sY = this.spiritAnimY * TILE_SIZE + TILE_SIZE / 2;
 
             // Draw Circle
             this.ctx.beginPath();

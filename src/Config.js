@@ -78,8 +78,8 @@ export const GAME_SETTINGS = {
     PLAYER_AP: 1,                 // 玩家每回合行动点数
 
     // 显形技能
-    SPIRIT_REVEAL_LIMIT: 4,       // 每局使用次数限制
-    SPIRIT_REVEAL_DURATION: 600,  // 显形持续时间 (毫秒)
+    SPIRIT_REVEAL_LIMIT: 400,       // 每局使用次数限制
+    SPIRIT_REVEAL_DURATION: 700,  // 显形持续时间 (毫秒)
 
     // 惩罚设置
     IDLE_PENALTY_LIGHTS: 2        // 待机惩罚熄灭灯及数量
