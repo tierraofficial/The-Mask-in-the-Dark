@@ -2,6 +2,9 @@ import { GridSystem } from './GridSystem.js';
 import { Player, Spirit } from './Entity.js';
 import { GRID_SIZE, GAME_SETTINGS } from './Config.js';
 import { UIManager } from './UIManager.js';
+import { InputHandler } from './InputHandler.js';
+import { TurnSystem } from './TurnSystem.js';
+import { AbilitySystem } from './AbilitySystem.js';
 
 export class GameManager {
     constructor(renderer, audioManager) {
@@ -12,27 +15,22 @@ export class GameManager {
         this.player = new Player(GAME_SETTINGS.PLAYER_START.x, GAME_SETTINGS.PLAYER_START.y);
         this.spirit = new Spirit(0, 0);
 
-        this.turn = 'PLAYER'; // PLAYER -> SPIRIT -> RESOLVE
+        // Game state
+        this.turn = 'PLAYER';
         this.gameOver = false;
-        this.wasDanger = false;
-
-        // Timer & AP System
-        this.timeLeft = GAME_SETTINGS.TURN_TIME_LIMIT;
-        this.currentAP = GAME_SETTINGS.PLAYER_AP;
-
-        this.lastTime = 0;
         this.isPaused = false;
+        this.wasDanger = false;
+        this.reqId = null;
+        this.raycaster = null;
+        this.screenManager = null;
 
-        // Bind keyboard
-        window.addEventListener('keydown', (e) => this.handleInput(e.key));
+        // Initialize subsystems
+        this.inputHandler = new InputHandler(this);
+        this.turnSystem = new TurnSystem(this);
+        this.abilitySystem = new AbilitySystem(this);
 
-        // Bind HTML Buttons
-        document.querySelectorAll('.d-pad div, .round-btn, .pill-btn, .big-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const key = btn.dataset.key;
-                if (key) this.handleInput(key);
-            });
-        });
+        // Bind events
+        this.inputHandler.bindEvents();
     }
 
     init() {
@@ -43,31 +41,24 @@ export class GameManager {
 
         // Audio
         if (this.audioManager) {
-            this.audioManager.stopAll(); // Safety reset
+            this.audioManager.stopAll();
             this.audioManager.playBgm();
         }
 
-        // Reset State
-        this.timeLeft = GAME_SETTINGS.TURN_TIME_LIMIT;
-        this.currentAP = GAME_SETTINGS.PLAYER_AP;
+        // Reset subsystems
+        this.turnSystem.reset();
+        this.abilitySystem.reset();
+
+        // Reset state
         this.wasDanger = false;
-
-        this.uiManager.updateAP(this.currentAP);
-        this.checkDanger();
-
-        this.revealCount = 0;
-        this.turnCount = 0;
         this.turn = 'PLAYER';
-        this.spirit.visible = false; // Reset Visibility on Restart
-        this.scanUsedThisTurn = false; // Track SCAN usage per turn
+        this.spirit.visible = false;
 
-        // Reset UI Label
-        const btnLabel = document.querySelector('.btn-wrapper .label');
-        if (btnLabel) btnLabel.innerText = "SCAN (3)";
+        this.uiManager.updateRound(this.turnSystem.turnCount);
+        this.checkDanger();
 
         // Force Raycaster Re-init (Rebuild Map/Textures)
         if (this.raycaster) {
-
             this.raycaster.initMap(this.gridSystem);
 
             // Reset Player Position in Raycaster to match new Grid
@@ -78,32 +69,10 @@ export class GameManager {
         }
 
         // Start Animation Loop
-        this.reqId = requestAnimationFrame((ts) => this.loop(ts));
+        this.reqId = requestAnimationFrame((ts) => this.turnSystem.loop(ts));
 
         console.log("Game Initialized (Strict Turn Mode)");
     }
-
-
-
-
-    loop(timestamp) {
-        if (!this.lastTime) this.lastTime = timestamp;
-        const deltaTime = timestamp - this.lastTime;
-        this.lastTime = timestamp;
-
-        if (!this.gameOver && !this.isPaused) {
-            // STRICT TIMER: Always counts down
-            this.timeLeft -= deltaTime;
-
-            if (this.timeLeft <= 0) {
-                this.resolveTurn();
-            }
-        }
-
-        this.draw();
-        this.reqId = requestAnimationFrame((ts) => this.loop(ts));
-    }
-
 
     placeSpirit() {
         let attempts = 0;
@@ -125,7 +94,8 @@ export class GameManager {
 
     setRaycaster(raycaster) {
         this.raycaster = raycaster;
-        // Inject Audio Manager to Raycaster here
+
+        // Inject Audio Manager to Raycaster
         if (this.audioManager) {
             this.raycaster.setAudioManager(this.audioManager);
         }
@@ -136,143 +106,9 @@ export class GameManager {
         // Bind Callback: 3D Movement -> 2D Logic
         this.raycaster.onPlayerMove = (dx, dy) => {
             console.log(`3D Move Detected: ${dx}, ${dy}`);
-            // Simulate "Input" for movement
-            this.handlePlayerMove(dx, dy);
+            this.inputHandler.handlePlayerMove(dx, dy);
         };
     }
-
-    // Separated logic for movement execution
-    handlePlayerMove(dx, dy) {
-        if (this.gameOver || this.isPaused) return;
-        if (this.turn !== 'PLAYER') return;
-
-        const targetX = this.player.x + dx;
-        const targetY = this.player.y + dy;
-
-        if (targetX >= 0 && targetX < GRID_SIZE && targetY >= 0 && targetY < GRID_SIZE) {
-            // 1. Apply Move
-            this.player.move(dx, dy);
-
-            // 2. Decrement AP
-            this.currentAP--;
-            this.uiManager.updateAP(this.currentAP);
-
-            // 3. Immediate Check
-            if (this.checkGameState()) return;
-
-            // 4. Interaction (Flip Lights)
-            this.gridSystem.flip(targetX, targetY);
-
-            // 5. Check Environment
-            if (this.checkGameState()) return;
-
-            // 6. Update Danger Status (immediately after moving to new room)
-            this.checkDanger();
-
-            // 7. WAIT FOR TIMER (No Spirit Turn here)
-            console.log(`Action Taken. AP: ${this.currentAP}`);
-        }
-    }
-
-    handleInput(key) {
-        if (this.gameOver || this.isPaused) return;
-
-        // GLOBAL INPUTS (Always allowed)
-        if (key === 'Reveal') {
-            this.triggerReveal();
-            return;
-        }
-
-        // Reveal (Consume Scan count)
-        if (key === 'f' || key === 'F') {
-            this.triggerReveal();
-            return;
-        }
-
-        // If Raycaster is active, IGNORE WASD for 2D movement to avoid conflicts!
-        // We only allow 'r' (Reset) or maybe 'Space' (Wait)
-        if (this.raycaster) {
-            if (key === 'r') { this.reset(); return; }
-            // Allow 'Space' to skip turn?
-            if (key === ' ' || key === 'Space') {
-                // Wait implementation? 
-            }
-            return;
-        }
-
-        // ... Old 2D Input Fallback (for debugging purely 2D mode) ...
-
-        // Strict Turn: Only allow input if it's PLAYER turn AND we have AP
-        if (this.turn !== 'PLAYER' || this.currentAP <= 0) return;
-
-        let dx = 0;
-        let dy = 0;
-
-        switch (key) {
-            case 'w': case 'ArrowUp': dy = -1; break;
-            case 's': case 'ArrowDown': dy = 1; break;
-            case 'a': case 'ArrowLeft': dx = -1; break;
-            case 'd': case 'ArrowRight': dx = 1; break;
-            case ' ': case 'Space': break; // Wait
-            case 'r': this.reset(); return;
-            case 'Enter': case 'Start': return;
-            default: return;
-        }
-
-        if (dx !== 0 || dy !== 0) {
-            this.handlePlayerMove(dx, dy);
-        }
-    }
-
-    triggerReveal() {
-        if (this.revealCount >= GAME_SETTINGS.SPIRIT_REVEAL_LIMIT) return;
-        if (this.spirit.visible) return; // Already visible
-        if (this.scanUsedThisTurn) return; // Already used this turn
-
-        console.log("SCANNING...");
-        this.revealCount++;
-        this.spirit.visible = true;
-        this.scanUsedThisTurn = true;
-
-        // Update button visual state
-        this.updateScanButtonState();
-
-        // Fix: Force complete current animation before new movement
-        // This ensures spirit always moves from grid positions, not mid-animation
-        if (this.renderer) {
-            this.renderer.spiritAnimX = this.renderer.spiritTargetX;
-            this.renderer.spiritAnimY = this.renderer.spiritTargetY;
-        }
-
-        // Spirit reacts to SCAN by moving immediately
-        const result = this.spirit.act(this.player, this.gridSystem);
-
-        // Handle spirit actions (similar to resolveTurn logic)
-        if (result && result.action === 'STUCK') {
-            const target = this.gridSystem.corruptRandomLight();
-            if (target && this.renderer) this.renderer.triggerWarning(target.x, target.y);
-        }
-        else if (result && result.action === 'CORRUPT') {
-            this.gridSystem.corruptLightAt(result.target.x, result.target.y);
-            if (this.renderer) this.renderer.triggerWarning(result.target.x, result.target.y);
-        }
-
-        // Check if spirit caught player during SCAN movement
-        if (this.checkGameState()) return;
-
-        // Update Button UI
-        const btnLabel = document.querySelector('.btn-wrapper .label');
-        if (btnLabel) btnLabel.innerText = `SCAN (${GAME_SETTINGS.SPIRIT_REVEAL_LIMIT - this.revealCount})`;
-
-        // Auto Hide
-        setTimeout(() => {
-            if (!this.gameOver) {
-                this.spirit.visible = false;
-            }
-        }, GAME_SETTINGS.SPIRIT_REVEAL_DURATION);
-    }
-
-
 
     reset() {
         // Stop previous loop to prevent duplication
@@ -285,76 +121,6 @@ export class GameManager {
         this.isPaused = false;
         this.spirit.hp = GAME_SETTINGS.SPIRIT_HP;
         this.init();
-    }
-
-    // Called when Time runs out (5s -> 0s)
-    resolveTurn() {
-        console.log("Turn Time Up. Resolving...");
-
-        // 1. Spirit Act (Priority: Spirit moves first)
-        this.turn = 'SPIRIT';
-
-        const result = this.spirit.act(this.player, this.gridSystem);
-
-        // Spirit Collision Check
-        if (this.checkGameState()) return;
-
-        // Spirit Special Actions
-        if (result && result.action === 'STUCK') {
-            const target = this.gridSystem.corruptRandomLight();
-            if (target && this.renderer) this.renderer.triggerWarning(target.x, target.y);
-        }
-        else if (result && result.action === 'CORRUPT') {
-            this.gridSystem.corruptLightAt(result.target.x, result.target.y);
-            if (this.renderer) this.renderer.triggerWarning(result.target.x, result.target.y);
-        }
-
-        // Check Environment
-        if (this.checkGameState()) return;
-
-        // Spirit Burn Check
-        if (this.gridSystem.isSafe(this.spirit.x, this.spirit.y)) {
-            this.spirit.hp--;
-            if (this.spirit.hp <= 0) {
-                this.endGame(true, "DEMON BANISHED");
-                return;
-            } else {
-                this.placeSpirit();
-                if (this.checkGameState()) return;
-            }
-        }
-
-        // Check Void
-        if (this.checkGameState()) return;
-
-        // 2. Idle Penalty (Check AP usage AFTER spirit move)
-        // This ensures the spirit doesn't get a 'free kill' on a tile that JUST went dark
-        if (this.currentAP === GAME_SETTINGS.PLAYER_AP) {
-            console.log("IDLE PENALTY TRIGGERED!");
-            for (let i = 0; i < GAME_SETTINGS.IDLE_PENALTY_LIGHTS; i++) {
-                this.gridSystem.corruptRandomLight();
-            }
-            if (this.checkGameState()) return;
-        }
-
-        // 3. Start Next Turn
-        this.startNextTurn();
-    }
-
-    startNextTurn() {
-        this.turnCount++; // Increment survival counter
-        this.timeLeft = GAME_SETTINGS.TURN_TIME_LIMIT;
-        this.currentAP = GAME_SETTINGS.PLAYER_AP;
-        this.turn = 'PLAYER';
-        this.scanUsedThisTurn = false; // Reset SCAN availability
-
-        this.uiManager.updateScore(this.gridSystem.lightCount);
-        this.uiManager.updateAP(this.currentAP);
-
-        // Update SCAN button state
-        this.updateScanButtonState();
-
-        this.checkDanger();
     }
 
     checkDanger() {
@@ -374,8 +140,10 @@ export class GameManager {
         this.wasDanger = isDanger;
     }
 
-    // Centralized State Checker
-    // Returns TRUE if game ended
+    /**
+     * Centralized State Checker
+     * Returns TRUE if game ended
+     */
     checkGameState() {
         // Priority 1: Caught (Instant Loss)
         if (this.player.x === this.spirit.x && this.player.y === this.spirit.y) {
@@ -400,7 +168,6 @@ export class GameManager {
         if (this.gameOver) return; // Prevent double trigger
 
         // --- Victory Condition Check: Survival Record ---
-        // Get previous record
         let highScore = 0;
         try {
             highScore = parseInt(localStorage.getItem('survival_record') || '0', 10);
@@ -410,19 +177,16 @@ export class GameManager {
 
         let isMercy = false;
         // If we survived longer than a non-zero record, the Spirit grants mercy
-        if (this.turnCount > highScore && highScore > 0) {
-            if (!win) {
-                isMercy = true;
-                win = true; // Override to WIN
-                msg = "NEW RECORD! MERCY GRANTED";
-            }
+        if (this.turnSystem.turnCount > highScore && highScore > 0) {
+            // No longer grant automatic win on new record
+            // Just logging or UI feedback could happen, but 'win' stays as passed in.
         }
 
         // Update Record if beaten
-        if (this.turnCount > highScore) {
+        if (this.turnSystem.turnCount > highScore) {
             try {
-                localStorage.setItem('survival_record', this.turnCount);
-                console.log(`New Record Set: ${this.turnCount}`);
+                localStorage.setItem('survival_record', this.turnSystem.turnCount);
+                console.log(`New Record Set: ${this.turnSystem.turnCount}`);
             } catch (e) { }
         }
         // ------------------------------------------------
@@ -435,10 +199,6 @@ export class GameManager {
             this.audioManager.stopBgm();
             if (!win) {
                 this.audioManager.playDie();
-            } else {
-                // Determine if we should play specific win sound? 
-                // For Mercy, maybe silence or a specific chime?
-                // Currently no win sound, so just silence BGM is fine.
             }
         }
 
@@ -451,28 +211,15 @@ export class GameManager {
         this.spirit.visible = true;
 
         this.renderer.draw(this.gridSystem, this.player, this.spirit, 0);
-        // this.uiManager.showGameOver(msg, win); // Deprecated by ScreenManager Video
 
         if (this.screenManager) {
-            this.screenManager.showGameOverVideo(this.turnCount, win);
+            this.screenManager.showGameOverVideo(this.turnSystem.turnCount, win);
         }
     }
 
     updateEnvironment() {
         const isSafe = this.gridSystem.isSafe(this.player.x, this.player.y);
         this.uiManager.updateAmbience(isSafe);
-    }
-
-
-    updateScanButtonState() {
-        const scanBtn = document.querySelector('.big-btn');
-        if (scanBtn) {
-            if (this.scanUsedThisTurn || this.revealCount >= GAME_SETTINGS.SPIRIT_REVEAL_LIMIT) {
-                scanBtn.classList.add('disabled');
-            } else {
-                scanBtn.classList.remove('disabled');
-            }
-        }
     }
 
     draw() {
@@ -490,6 +237,6 @@ export class GameManager {
             rotation = Math.atan2(this.raycaster.player.dirY, -this.raycaster.player.dirX);
         }
 
-        this.renderer.draw(this.gridSystem, this.player, this.spirit, this.timeLeft, rotation);
+        this.renderer.draw(this.gridSystem, this.player, this.spirit, this.turnSystem.timeLeft, rotation);
     }
 }

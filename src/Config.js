@@ -60,7 +60,7 @@ export const GAME_SETTINGS = {
     PLAYER_START: { x: 2, y: 2 }, // 玩家出生点 (中心)
 
     // 恶灵设置
-    SPIRIT_HP: 100,                 // 恶灵生命值 (被光照几次后驱逐)
+    SPIRIT_HP: 5,                 // 恶灵生命值 (被光照几次后驱逐)
     TRAP_THRESHOLD: 5,            // 困兽阈值 (如果连通暗区小于此值，视为被困，触发破坏)
 
     // 回合设置

@@ -17,6 +17,18 @@ export class Renderer {
         this.spiritAnimY = 0;
         this.spiritTargetX = 0;
         this.spiritTargetY = 0;
+
+        // Visual Effects State
+        this.shakeIntensity = 0;
+        // Damage Flash local grid state (0.0 to 1.0)
+        this.damageFlashStates = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
+    }
+
+    triggerDamageEffect(x, y) {
+        this.shakeIntensity = 15;
+        if (x >= 0 && x < GRID_SIZE && y >= 0 && y < GRID_SIZE) {
+            this.damageFlashStates[x][y] = 1.0;
+        }
     }
 
     triggerWarning(x, y) {
@@ -71,11 +83,26 @@ export class Renderer {
                     this.warningStates[x][y] -= 0.05; // Decay Speed
                     if (this.warningStates[x][y] < 0) this.warningStates[x][y] = 0;
                 }
+
+                // 3. Damage Flash State (Decay)
+                if (this.damageFlashStates[x][y] > 0) {
+                    this.damageFlashStates[x][y] -= 0.1; // Fast Decay
+                    if (this.damageFlashStates[x][y] < 0) this.damageFlashStates[x][y] = 0;
+                }
             }
         }
 
         this.ctx.save();
-        // this.ctx.translate(offsetX, offsetY); // Assume 600x600 matches config
+
+        // Apply Shake Effect
+        if (this.shakeIntensity > 0) {
+            const rx = (Math.random() - 0.5) * this.shakeIntensity;
+            const ry = (Math.random() - 0.5) * this.shakeIntensity;
+            this.ctx.translate(rx, ry);
+
+            this.shakeIntensity *= 0.85; // Fast Decay
+            if (this.shakeIntensity < 0.5) this.shakeIntensity = 0;
+        }
 
         // Draw LCD Grid Cells
         for (let x = 0; x < GRID_SIZE; x++) {
@@ -116,6 +143,17 @@ export class Renderer {
                         }
                     }
 
+                    this.ctx.fillRect(posX + 1, posY + 1, size - 2, size - 2);
+                    this.ctx.restore();
+                }
+
+                // NEW: Damage Flash Overlay (White Flash on specific tile)
+                const flashVal = this.damageFlashStates[x][y];
+                if (flashVal > 0.01) {
+                    this.ctx.save();
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${flashVal})`;
+                    this.ctx.shadowColor = 'white';
+                    this.ctx.shadowBlur = 20;
                     this.ctx.fillRect(posX + 1, posY + 1, size - 2, size - 2);
                     this.ctx.restore();
                 }

@@ -13,13 +13,7 @@ window.onload = () => {
 
     // 2. Game Logic (But don't start loop yet)
     const game = new GameManager(renderer, audioManager);
-    // Note: game.init() calls gridSystem.init(), which we needed for Raycaster.
-    // However, since we want ScreenManager to handle the "Start", we can either let it run 
-    // or manually init gridSystem just for Raycaster setup.
-    // game.init() starts the loop requestAnimationFrame.
-    // We want to PAUSE that or defer it.
-    // Let's rely on ScreenManager.showGameScreen -> game.reset() -> game.init().
-    // BUT Raycaster needs gridSystem NOW.
+
     game.gridSystem.init(); // Just init data, don't start game loop
 
     // 3. UI Flow Manager

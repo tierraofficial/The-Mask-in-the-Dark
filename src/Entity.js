@@ -1,4 +1,6 @@
 import { GAME_SETTINGS } from './Config.js';
+import { findPath, floodFill, getWalkableNeighbors } from './utils/Pathfinding.js';
+import { manhattanDistance } from './utils/MathUtils.js';
 
 export class Entity {
     constructor(x, y) {
@@ -36,7 +38,7 @@ export class Spirit extends Entity {
         // NEW BEHAVIOR: Stalking Priority
         // ======================================
 
-        const dist = Math.abs(this.x - player.x) + Math.abs(this.y - player.y);
+        const dist = manhattanDistance(this.x, this.y, player.x, player.y);
 
         // 1. If currently adjacent to player (in Dark), STAY PUT.
         // (Maintaining pressure)
@@ -86,8 +88,8 @@ export class Spirit extends Entity {
         if (moves.length > 0) {
             // Pick move closest to player
             moves.sort((a, b) => {
-                const dA = Math.abs(a.x - player.x) + Math.abs(a.y - player.y);
-                const dB = Math.abs(b.x - player.x) + Math.abs(b.y - player.y);
+                const dA = manhattanDistance(a.x, a.y, player.x, player.y);
+                const dB = manhattanDistance(b.x, b.y, player.x, player.y);
                 return dA - dB;
             });
             const bestMove = moves[0];
@@ -101,7 +103,7 @@ export class Spirit extends Entity {
     }
 
     canAttack(player, gridSystem) {
-        const dist = Math.abs(this.x - player.x) + Math.abs(this.y - player.y);
+        const dist = manhattanDistance(this.x, this.y, player.x, player.y);
         // CRITICAL FIX: Cannot attack if player is in Safe Zone (Light)
         const isPlayerSafe = gridSystem.isSafe(player.x, player.y);
         return dist <= 1 && !isPlayerSafe;
@@ -121,7 +123,7 @@ export class Spirit extends Entity {
             if (nx >= 0 && nx < 5 && ny >= 0 && ny < 5) {
                 if (!gridSystem.isSafe(nx, ny)) {
                     // This is a candidate spot. Is it reachable/closest?
-                    const d = Math.abs(this.x - nx) + Math.abs(this.y - ny);
+                    const d = manhattanDistance(this.x, this.y, nx, ny);
                     if (d < minDistToSpirit) {
                         minDistToSpirit = d;
                         bestSpot = { x: nx, y: ny };
@@ -134,82 +136,16 @@ export class Spirit extends Entity {
 
     // Generic Pathfinding to specific coordinate (BFS)
     findPathToTarget(tx, ty, gridSystem) {
-        const startNode = { x: this.x, y: this.y, p: null };
-        const queue = [startNode];
-        const visited = new Set();
-        visited.add(`${this.x},${this.y}`);
-
-        let closestNode = startNode;
-        let minDist = 999;
-
-        while (queue.length > 0) {
-            const curr = queue.shift();
-
-            // Check if reached target
-            if (curr.x === tx && curr.y === ty) {
-                // Reconstruct
-                let path = [];
-                let tmp = curr; // Use tmp to unlike curr since we need to keep curr for logic below? Actually just reuse logic.
-                // Wait, need to reconstruct from curr.
-                while (tmp.p) {
-                    path.unshift({ x: tmp.x, y: tmp.y });
-                    tmp = tmp.p;
-                }
-                return path;
-            }
-
-            // Calc distance for fallback (though BFS guarantees shortest)
-            const d = Math.abs(curr.x - tx) + Math.abs(curr.y - ty);
-            if (d < minDist) {
-                minDist = d;
-                closestNode = curr;
-            }
-
-            const neighbors = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }];
-            for (let n of neighbors) {
-                const nx = curr.x + n.x;
-                const ny = curr.y + n.y;
-                const key = `${nx},${ny}`;
-
-                if (nx >= 0 && nx < 5 && ny >= 0 && ny < 5 && !visited.has(key)) {
-                    // Move validity: Spirit needs Dark tiles
-                    if (!gridSystem.isSafe(nx, ny)) {
-                        visited.add(key);
-                        queue.push({ x: nx, y: ny, p: curr });
-                    }
-                }
-            }
-        }
-        return null;
+        // Use utility function with custom walkability check
+        const isWalkable = (x, y) => !gridSystem.isSafe(x, y);
+        return findPath(this.x, this.y, tx, ty, 5, isWalkable);
     }
 
     // Flood Fill to count connected OFF tiles
     getTerritorySize(gridSystem) {
-        const queue = [{ x: this.x, y: this.y }];
-        const visited = new Set();
-        visited.add(`${this.x},${this.y}`);
-        let count = 0;
-
-        while (queue.length > 0) {
-            const curr = queue.shift();
-            count++;
-
-            const neighbors = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }];
-            for (let n of neighbors) {
-                const nx = curr.x + n.x;
-                const ny = curr.y + n.y;
-                const key = `${nx},${ny}`;
-
-                // Check Bounds, Not Visited, and IS DARK
-                if (nx >= 0 && nx < 5 && ny >= 0 && ny < 5 && !visited.has(key)) {
-                    if (!gridSystem.isSafe(nx, ny)) {
-                        visited.add(key);
-                        queue.push({ x: nx, y: ny });
-                    }
-                }
-            }
-        }
-        return count;
+        // Use utility function with custom walkability check
+        const isWalkable = (x, y) => !gridSystem.isSafe(x, y);
+        return floodFill(this.x, this.y, 5, isWalkable);
     }
 
     findWeakestWall(player, gridSystem) {
@@ -225,7 +161,7 @@ export class Spirit extends Entity {
             if (nx >= 0 && nx < 5 && ny >= 0 && ny < 5) {
                 // Must be a Light (Wall) to break it
                 if (gridSystem.isSafe(nx, ny)) {
-                    const dist = Math.abs(nx - player.x) + Math.abs(ny - player.y);
+                    const dist = manhattanDistance(nx, ny, player.x, player.y);
                     if (dist < minPlayerDist) {
                         minPlayerDist = dist;
                         bestWall = { x: nx, y: ny };
@@ -237,20 +173,9 @@ export class Spirit extends Entity {
     }
 
     getAvailableMoves(gridSystem) {
-        const moves = [];
-        const neighbors = [
-            { x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }
-        ];
-
-        for (let n of neighbors) {
-            const nx = this.x + n.x;
-            const ny = this.y + n.y;
-            // Spirit can only move on OFF tiles (isSafe = false)
-            if (nx >= 0 && nx < 5 && ny >= 0 && ny < 5 && !gridSystem.isSafe(nx, ny)) {
-                moves.push({ x: nx, y: ny });
-            }
-        }
-        return moves;
+        // Use utility function with custom walkability check
+        const isWalkable = (x, y) => !gridSystem.isSafe(x, y);
+        return getWalkableNeighbors(this.x, this.y, 5, isWalkable);
     }
 
     findPathTo(player, gridSystem) {
@@ -269,7 +194,7 @@ export class Spirit extends Entity {
         while (queue.length > 0) {
             const curr = queue.shift();
 
-            const dist = Math.abs(curr.x - tx) + Math.abs(curr.y - ty);
+            const dist = manhattanDistance(curr.x, curr.y, tx, ty);
             if (dist < minDist) {
                 minDist = dist;
                 closestNode = curr;

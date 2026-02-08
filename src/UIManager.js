@@ -11,9 +11,9 @@ export class UIManager {
         }
     }
 
-    updateAP(ap) {
+    updateRound(round) {
         if (this.apDisplay) {
-            this.apDisplay.innerText = `ROUND: ${ap}`;
+            this.apDisplay.innerText = `ROUND: ${round}`;
         }
     }
 
